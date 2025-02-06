@@ -59,35 +59,42 @@ pub fn Constrained(comptime max: u8, comptime min: u8) type {
             }
 
             var i = str.len - 1;
+            var verifier: u8 = 0;
 
-            // First non whitespace char is the verifier
-            const ver = str[i];
-            if (!std.ascii.isDigit(ver) or ver != 'K' or ver != 'k') {
-                return error.InvalidVerifier;
+            if (i > 1 and str[i - 1] == '-') {
+                verifier = str[i];
+                if (verifier == 'k') {
+                    verifier = 'K';
+                }
+
+                if (!std.ascii.isDigit(verifier) and verifier != 'K') {
+                    return error.InvalidVerifier;
+                }
+
+                i -= 1;
+            } else {
+                i += 1;
             }
 
-            // If next character is "-", we skip it
-            if (i > 0 and str[i - 1] == '-') {
-                i -= 2;
-            }
-
-            // The rut number
+            // Consume the rest of the digits in reverse
             var num: u32 = 0;
-
-            // We consume the rest of characters
+            var mul: u32 = 1;
             while (i > 0) : (i -= 1) {
-                if (str[i] == '.') {
+                if (str[i - 1] == '.') {
                     continue; // Ignore dots
                 }
 
-                if (!std.ascii.isDigit(str[i])) {
+                if (!std.ascii.isDigit(str[i - 1])) {
                     return error.InvalidCharacter;
                 }
 
-                num = num * 10 + (str[i] - '0');
+                const d = (str[i - 1] - '0');
+                num += mul * d;
+                mul *= 10;
             }
 
-            if (computeVerifier(num) != ver) {
+            const computed_verifier = computeVerifier(num);
+            if (verifier != 0 and verifier != computed_verifier) {
                 return error.VerifierMismatch;
             }
 
@@ -220,6 +227,7 @@ test "computeVerifier" {
     try std.testing.expectEqual('2', computeVerifier(16_894_365));
     try std.testing.expectEqual('2', computeVerifier(24_736_732));
     try std.testing.expectEqual('4', computeVerifier(9_433_316));
+    try std.testing.expectEqual('K', computeVerifier(25_917_936));
 }
 
 test "Standard_new" {
@@ -231,8 +239,9 @@ test "Standard_new" {
 
 test "Standard_parse" {
     try std.testing.expectEqual(16_894_365, (try Standard.parse("16.894.365-2")).num);
-    try std.testing.expectEqual(9_433_316, (try Standard.parse("16894365-2")).num);
-    try std.testing.expectEqual(9_433_316, (try Standard.parse("168943652")).num);
+    try std.testing.expectEqual(16_894_365, (try Standard.parse("16894365-2")).num);
+    try std.testing.expectEqual(16_894_365, (try Standard.parse("16894365")).num);
+    try std.testing.expectEqual(25_917_936, (try Standard.parse("25.917.936-K")).num);
 
     try std.testing.expectError(error.EmptyString, Standard.parse(""));
     try std.testing.expectError(error.DigitLengthOutOfBounds, Standard.parse("1"));
