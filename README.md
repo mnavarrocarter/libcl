@@ -16,7 +16,7 @@ const cl = @import("libcl");
 testing "it_creates_rut" {
     try std.testing.expectEqual(16_894_365, (try cl.id.rut.Standard.parse("16.894.365-2")).num);
     try std.testing.expectEqual(9_433_316, (try cl.id.rut.Standard.parse("9433316-4")).num);
-    try std.testing.expectEqual(9_433_316, (try cl.id.rut.Standard.parse("94333164")).num);
+    try std.testing.expectEqual(9_433_316, (try cl.id.rut.Standard.parse("9433316")).num);
 }
 ```
 
