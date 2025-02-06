@@ -1,0 +1,13 @@
+.{
+    .name = "libcl",
+    .version = "0.1.0",
+    .minimum_zig_version = "0.14.0",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "exe",
+        "lib",
+        "LICENSE",
+        "README.md",
+    },
+}
