@@ -22,6 +22,8 @@ testing "it_creates_rut" {
     try std.testing.expectFmt("16894365-2", "{s}", .{rut});
     // "n" stands for numeric format
     try std.testing.expectFmt("16894365", "{n}", .{rut});
+    // A blank format specifier prints the human format
+    try std.testing.expectFmt("16894365", "{}", .{rut});
 }
 ```
 
@@ -50,7 +52,7 @@ const std = @import("std");
 const cl = @import("libcl");
 
 testing "it_creates_non_standard" {
-    // This type accepts now between 9 and 6 digits
+    // This type now accepts Ruts between 9 and 6 digits
     const NonStandard = cl.id.rut.Constrained(9, 6);
     
     // It works with 9 digits now

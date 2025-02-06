@@ -52,42 +52,49 @@ pub fn Constrained(comptime max: u8, comptime min: u8) type {
             _: std.fmt.FormatOptions,
             writer: anytype,
         ) !void {
-            // Number format can be done using normal print
-            if (std.mem.eql(u8, fmt, "n")) {
-                try writer.print("{d}", .{self.num});
-                return;
-            }
+            const mode = comptime parseFormat(fmt, Self);
 
-            // Simple format can also be done using normal print
-            if (std.mem.eql(u8, fmt, "s")) {
-                try writer.print("{d}-{c}", .{ self.num, computeVerifier(self.num) });
-                return;
-            }
+            return switch (mode) {
+                // Numeric format is easy
+                Format.Numeric => {
+                    return try writer.print("{d}", .{self.num});
+                },
 
-            // Human format is a bit more complex
-            // Create buffer of digit length + separators + dash + verifier digit
-            var buffer: [max + max_separators + 2]u8 = undefined;
-            var i = buffer.len;
+                // Simple format is also easy
+                Format.Simple => {
+                    return try writer.print("{d}-{c}", .{ self.num, computeVerifier(self.num) });
+                },
 
-            buffer[i - 1] = computeVerifier(self.num);
-            buffer[i - 2] = '-';
-            i -= 2;
+                // Human format is a bit more complex.
+                // To make it efficient we need to allocate a buffer of the max digit length,
+                // and also consider the thousand separators required for those digits, plus
+                // the dash and the verifier.
+                // We write it backwards as well.
+                Format.Human => {
+                    var buffer: [max + max_separators + 2]u8 = undefined;
+                    var i = buffer.len;
 
-            // Process number
-            var n = self.num;
-            var count: usize = 0;
-            while (n > 0 or count == 0) {
-                if (count > 0 and count % 3 == 0) {
-                    buffer[i - 1] = '.';
-                    i -= 1;
-                }
-                buffer[i - 1] = @intCast('0' + n % 10); // Don't understand this line
-                n /= 10;
-                i -= 1;
-                count += 1;
-            }
+                    buffer[i - 1] = computeVerifier(self.num);
+                    buffer[i - 2] = '-';
+                    i -= 2;
 
-            try writer.writeAll(buffer[i..]);
+                    // Process number
+                    var n = self.num;
+                    var count: usize = 0;
+                    while (n > 0 or count == 0) {
+                        if (count > 0 and count % 3 == 0) {
+                            buffer[i - 1] = '.';
+                            i -= 1;
+                        }
+                        buffer[i - 1] = @intCast('0' + n % 10); // Don't understand this line
+                        n /= 10;
+                        i -= 1;
+                        count += 1;
+                    }
+
+                    try writer.writeAll(buffer[i..]);
+                },
+            };
         }
     };
 }
@@ -124,6 +131,32 @@ pub fn computeVerifier(num: u32) u8 {
     };
 }
 
+const Format = enum {
+    Human,
+    Simple,
+    Numeric,
+};
+
+fn parseFormat(comptime fmt: []const u8, comptime t: anytype) Format {
+    if (std.mem.eql(u8, fmt, "n")) {
+        return Format.Numeric;
+    }
+
+    if (std.mem.eql(u8, fmt, "h")) {
+        return Format.Human;
+    }
+
+    if (std.mem.eql(u8, fmt, "s")) {
+        return Format.Simple;
+    }
+
+    if (fmt.len != 0) {
+        @compileError("Invalid format '" ++ fmt ++ "' for type '" ++ @typeName(t) ++ "'");
+    }
+
+    return Format.Human;
+}
+
 fn countDigits(num: u32) u8 {
     var n = num;
     var count: u8 = 0;
@@ -157,6 +190,7 @@ test "NonStandard" {
 }
 
 test "Standard_format" {
+    try std.testing.expectFmt("16.894.365-2", "{}", .{try Standard.new(16_894_365)});
     try std.testing.expectFmt("16.894.365-2", "{h}", .{try Standard.new(16_894_365)});
     try std.testing.expectFmt("16894365-2", "{s}", .{try Standard.new(16_894_365)});
     try std.testing.expectFmt("16894365", "{n}", .{try Standard.new(16_894_365)});
