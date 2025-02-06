@@ -7,7 +7,20 @@ Contains utilities to work with different things related to Chile.
 
 This library provides support for working with Chilean RUTs.
 
-Creating a new RUT and formatting it is simple enough:
+You can parse Ruts in various string forms very easily:
+
+```zig
+const std = @import("std");
+const cl = @import("libcl");
+
+testing "it_creates_rut" {
+    try std.testing.expectEqual(16_894_365, (try cl.id.rut.Standard.parse("16.894.365-2")).num);
+    try std.testing.expectEqual(9_433_316, (try cl.id.rut.Standard.parse("9433316-4")).num);
+    try std.testing.expectEqual(9_433_316, (try cl.id.rut.Standard.parse("94333164")).num);
+}
+```
+
+Creating a new RUT from the raw number and formatting it is simple enough too:
 
 ```zig
 const std = @import("std");

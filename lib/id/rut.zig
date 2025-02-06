@@ -8,6 +8,14 @@ pub const RutError = error{
     DigitLengthOutOfBounds,
 };
 
+pub const ParseError = error{
+    EmptyString,
+    // When a character that is not the verifier is found
+    InvalidVerifier,
+    InvalidCharacter,
+    VerifierMismatch,
+} || RutError;
+
 // Represents an standard RUT.
 //
 // The standard is to have a maximum of 8 digits and a minimum of 7 in their
@@ -42,8 +50,48 @@ pub fn Constrained(comptime max: u8, comptime min: u8) type {
             return .{ .num = num };
         }
 
-        pub fn parse(_: []const u8) !Self {
-            @panic("Not Implemented");
+        // Parses a RUT string representation
+        // The string representation must have the verifier digit
+        // It is assumed the last character in the string is the verifier.
+        pub fn parse(str: []const u8) ParseError!Self {
+            if (str.len == 0) {
+                return error.EmptyString;
+            }
+
+            var i = str.len - 1;
+
+            // First non whitespace char is the verifier
+            const ver = str[i];
+            if (!std.ascii.isDigit(ver) or ver != 'K' or ver != 'k') {
+                return error.InvalidVerifier;
+            }
+
+            // If next character is "-", we skip it
+            if (i > 0 and str[i - 1] == '-') {
+                i -= 2;
+            }
+
+            // The rut number
+            var num: u32 = 0;
+
+            // We consume the rest of characters
+            while (i > 0) : (i -= 1) {
+                if (str[i] == '.') {
+                    continue; // Ignore dots
+                }
+
+                if (!std.ascii.isDigit(str[i])) {
+                    return error.InvalidCharacter;
+                }
+
+                num = num * 10 + (str[i] - '0');
+            }
+
+            if (computeVerifier(num) != ver) {
+                return error.VerifierMismatch;
+            }
+
+            return new(num);
         }
 
         pub fn format(
@@ -179,6 +227,19 @@ test "Standard_new" {
 
     try std.testing.expectError(error.DigitLengthOutOfBounds, Standard.new(916_894_365));
     try std.testing.expectError(error.DigitLengthOutOfBounds, Standard.new(894_365));
+}
+
+test "Standard_parse" {
+    try std.testing.expectEqual(16_894_365, (try Standard.parse("16.894.365-2")).num);
+    try std.testing.expectEqual(9_433_316, (try Standard.parse("16894365-2")).num);
+    try std.testing.expectEqual(9_433_316, (try Standard.parse("168943652")).num);
+
+    try std.testing.expectError(error.EmptyString, Standard.parse(""));
+    try std.testing.expectError(error.DigitLengthOutOfBounds, Standard.parse("1"));
+    try std.testing.expectError(error.DigitLengthOutOfBounds, Standard.parse("17.121-2"));
+    try std.testing.expectError(error.InvalidVerifier, Standard.parse("16.894.365-f"));
+    try std.testing.expectError(error.InvalidCharacter, Standard.parse("16-894-365-k"));
+    try std.testing.expectError(error.VerifierMismatch, Standard.parse("16.894.365-k"));
 }
 
 test "NonStandard" {
